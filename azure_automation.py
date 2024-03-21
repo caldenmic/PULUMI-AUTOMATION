@@ -5,6 +5,7 @@ import pulumi_azure as azure
 import pulumi_tls as tls
 import pulumi_std as std
 import pulumi_azuread as azuread
+import time
 
 def get_config_object(config_file_path):
     with open(config_file_path, 'r') as config_file:
@@ -31,8 +32,11 @@ def create_azure_vm():
     vm_name = config_object['vmName']
     vm_location = config_object['location']
     vm_size = config_object['vmSize']
+    stack_name = config_object['stackName']
     admin_username = config_object['adminUsername']
     storage_account_type = config_object['storageAccountType']
+    ip_configuration_name = config_object['ipConfigurationName']
+    ip_address_resource_name = config_object['ipAddressResourceName']
 
 
     # Use existing Resource Group
@@ -46,7 +50,7 @@ def create_azure_vm():
 
     # Create a public IP address for the VM
     public_ip = azure.network.PublicIp(
-        resource_name="public-ip",
+        resource_name=ip_address_resource_name,
         resource_group_name=resource_group.name,
         allocation_method="Dynamic",
     )
@@ -56,7 +60,7 @@ def create_azure_vm():
         network_interface_name,
         resource_group_name=resource_group.name,
         ip_configurations=[azure.network.NetworkInterfaceIpConfigurationArgs(
-            name=f"{vm_name}-ipconfiguration",
+            name=ip_configuration_name,
             subnet_id=f"{resource_group_id}/providers/Microsoft.Network/virtualNetworks/test-vnet/subnets/{existing_vnet.subnets[0]}",
             private_ip_address_allocation="Dynamic",
             public_ip_address_id=public_ip.id
@@ -110,7 +114,7 @@ def pass_function():
 
 try:
     config_object = get_config_object('./config.json')
-    stack = deploy_project(config_object['projectName'], config_object['stackName'], create_azure_vm)
-    # destroy_project(config_object['projectName'], config_object['stackName'], pass_function)
+    # stack = deploy_project(config_object['projectName'], config_object['stackName'], create_azure_vm)
+    destroy_project(config_object['projectName'], config_object['stackName'], pass_function)
 except Exception as e:
     print(e)
