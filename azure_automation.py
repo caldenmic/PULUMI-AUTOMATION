@@ -28,7 +28,7 @@ def create_azure_vm():
     vnet_name = config_object['vnetName']
     security_group_name = config_object['securityGroupName']
     network_interface_name = config_object['networkInterfaceName']
-    vm_name = config_object['vnetName']
+    vm_name = config_object['vmName']
     vm_location = config_object['location']
     vm_size = config_object['vmSize']
     admin_username = config_object['adminUsername']
@@ -110,7 +110,7 @@ def pass_function():
 
 try:
     config_object = get_config_object('./config.json')
-    # stack = deploy_project(config_object['projectName'], config_object['stackName'], create_azure_vm)
-    destroy_project(config_object['projectName'], config_object['stackName'], pass_function)
+    stack = deploy_project(config_object['projectName'], config_object['stackName'], create_azure_vm)
+    # destroy_project(config_object['projectName'], config_object['stackName'], pass_function)
 except Exception as e:
     print(e)
