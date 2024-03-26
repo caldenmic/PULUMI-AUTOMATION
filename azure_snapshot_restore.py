@@ -13,8 +13,8 @@ def get_config_object(config_file_path):
     pulumi.runtime.config.CONFIG.set(config_data)
     return pulumi.runtime.config.CONFIG.get()
 
-def create_azure_vm():
-    config_object = get_config_object('./config.json')
+def restore_from_snapshot():
+    config_object = get_config_object('./config_snapshot.json')
     os_image_publisher, os_image_offer, os_image_sku, os_image_version = config_object['osImage'].split(":")
 
     # Create an SSH key
@@ -30,13 +30,15 @@ def create_azure_vm():
     security_group_name = config_object['securityGroupName']
     network_interface_name = config_object['networkInterfaceName']
     vm_name = config_object['vmName']
-    vm_location = config_object['location']
+    location = config_object['location']
     vm_size = config_object['vmSize']
     stack_name = config_object['stackName']
     admin_username = config_object['adminUsername']
     storage_account_type = config_object['storageAccountType']
     ip_configuration_name = config_object['ipConfigurationName']
     ip_address_resource_name = config_object['ipAddressResourceName']
+    snapshot_name = config_object['snapshotName']
+    managed_disk_name = config_object['managedDiskName']
 
 
     # Use existing Resource Group
@@ -73,27 +75,28 @@ def create_azure_vm():
         network_security_group_id=existing_network_security_group.id,
     )
 
-    # Create the virtual machine
-    vm = azure.compute.LinuxVirtualMachine(
-        resource_name=vm_name,
+    snapshot = azure.compute.Snapshot.get(
+        resource_name=snapshot_name,
         resource_group_name=resource_group.name,
-        location=vm_location,
-        size=vm_size,
-        admin_username=admin_username,
+        id=f"{resource_group_id}/providers/Microsoft.Compute/snapshots/{snapshot_name}"
+    )
+    
+    managed_disk = azure.compute.ManagedDisk.get(
+        resource_name=managed_disk_name,
+        id=f"{resource_group_id}/providers/Microsoft.Compute/disks/{managed_disk_name}",
+        resource_group_name=resource_group.name
+    )
+
+    vm = azure.compute.VirtualMachine(
+        resource_name=vm_name,
+        vm_size=vm_size,
+        resource_group_name=resource_group.name,
         network_interface_ids=[network_interface.id],
-        admin_ssh_keys=[azure.compute.LinuxVirtualMachineAdminSshKeyArgs(
-            username=admin_username,
-            public_key=ssh_key.public_key_openssh,
-        )],
-        os_disk=azure.compute.LinuxVirtualMachineOsDiskArgs(
-            caching="ReadWrite",
-            storage_account_type=storage_account_type,
-        ),
-        source_image_reference=azure.compute.LinuxVirtualMachineSourceImageReferenceArgs(
-            publisher=os_image_publisher,
-            offer=os_image_offer,
-            sku=os_image_sku,
-            version=os_image_version,
+        storage_os_disk=azure.compute.VirtualMachineStorageOsDiskArgs(
+            create_option="Attach",
+            name=managed_disk_name,
+            managed_disk_id=managed_disk.id,
+            os_type="Linux"
         )
     )
 
@@ -113,8 +116,8 @@ def pass_function():
     pass
 
 try:
-    config_object = get_config_object('./config.json')
-    stack = deploy_project(config_object['projectName'], config_object['stackName'], create_azure_vm)
+    config_object = get_config_object('./config_snapshot.json')
+    stack = deploy_project(config_object['projectName'], config_object['stackName'], restore_from_snapshot)
     # destroy_project(config_object['projectName'], config_object['stackName'], pass_function)
 except Exception as e:
     print(e)

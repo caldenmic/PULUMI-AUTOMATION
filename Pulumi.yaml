@@ -1,3 +1,0 @@
-main: ./azure_vm.py
-name: SampleAzure
-runtime: python
