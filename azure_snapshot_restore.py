@@ -3,9 +3,7 @@ import json
 import pulumi.automation as auto
 import pulumi_azure as azure
 import pulumi_tls as tls
-import pulumi_std as std
 import pulumi_azuread as azuread
-import time
 
 def get_config_object(config_file_path):
     with open(config_file_path, 'r') as config_file:
@@ -54,7 +52,7 @@ def restore_from_snapshot():
     public_ip = azure.network.PublicIp(
         resource_name=ip_address_resource_name,
         resource_group_name=resource_group.name,
-        allocation_method="Dynamic",
+        allocation_method="Static",
     )
 
     # Create a network interface
@@ -80,11 +78,13 @@ def restore_from_snapshot():
         resource_group_name=resource_group.name,
         id=f"{resource_group_id}/providers/Microsoft.Compute/snapshots/{snapshot_name}"
     )
-    
-    managed_disk = azure.compute.ManagedDisk.get(
+
+    managed_disk = azure.compute.ManagedDisk(
         resource_name=managed_disk_name,
-        id=f"{resource_group_id}/providers/Microsoft.Compute/disks/{managed_disk_name}",
-        resource_group_name=resource_group.name
+        resource_group_name=resource_group_name,
+        source_resource_id=snapshot.id,
+        create_option="Copy",
+        storage_account_type=storage_account_type
     )
 
     vm = azure.compute.VirtualMachine(
@@ -94,11 +94,15 @@ def restore_from_snapshot():
         network_interface_ids=[network_interface.id],
         storage_os_disk=azure.compute.VirtualMachineStorageOsDiskArgs(
             create_option="Attach",
-            name=managed_disk_name,
+            name=managed_disk.name,
             managed_disk_id=managed_disk.id,
             os_type="Linux"
         )
     )
+
+    pulumi.export('ip_address', public_ip.ip_address)
+    pulumi.export('public_key', ssh_key.public_key_pem)
+    pulumi.export('private_key', ssh_key.private_key_pem)
 
 def deploy_project(project_name: str, stack_name: str, program: callable):
     stack = auto.create_or_select_stack(stack_name=stack_name, project_name=project_name, program=program)
