@@ -1,26 +1,10 @@
 import pulumi
-import json
 import pulumi.automation as auto
 import pulumi_azure_native as azure
-import pulumi_tls as tls
-import pulumi_azuread as azuread
-
-def get_config_object(config_file_path):
-    with open(config_file_path, 'r') as config_file:
-        config_data = json.load(config_file)
-    pulumi.runtime.config.CONFIG.set(config_data)
-    return pulumi.runtime.config.CONFIG.get()
+import azure_config
 
 def restore_from_snapshot():
-    config_object = get_config_object('./config_snapshot.json')
-    os_image_publisher, os_image_offer, os_image_sku, os_image_version = config_object['osImage'].split(":")
-
-    # Create an SSH key
-    ssh_key = tls.PrivateKey(
-        "ssh-key",
-        algorithm = "RSA",
-        rsa_bits = 4096,
-    )
+    config_object = azure_config.get_config_object('./config_snapshot.json')
 
     resource_group_name = config_object['resourceGroupName']
     resource_group_id = config_object['resourceGroupId']
@@ -121,8 +105,6 @@ def restore_from_snapshot():
     )
 
     pulumi.export('ip_address', public_ip.ip_address)
-    pulumi.export('public_key', ssh_key.public_key_pem)
-    pulumi.export('private_key', ssh_key.private_key_pem)
 
 def deploy_project(project_name: str, stack_name: str, program: callable):
     stack = auto.create_or_select_stack(stack_name=stack_name, project_name=project_name, program=program)
@@ -130,18 +112,8 @@ def deploy_project(project_name: str, stack_name: str, program: callable):
     stack.up(on_output=print)
     return stack
 
-def destroy_project(project_name: str, stack_name: str, program: callable):
-    stack = auto.create_or_select_stack(stack_name=stack_name, project_name=project_name, program=program)
-    stack.refresh(on_output=print)
-    stack.destroy(on_output=print)
-    print(f"stack {stack_name} in project {project_name} removed")
-
-def pass_function():
-    pass
-
 try:
-    config_object = get_config_object('./config_snapshot.json')
+    config_object = azure_config.get_config_object('./config_snapshot.json')
     stack = deploy_project(config_object['projectName'], config_object['stackName'], restore_from_snapshot)
-    # destroy_project(config_object['projectName'], config_object['stackName'], pass_function)
 except Exception as e:
-    print(e)
+    raise e
