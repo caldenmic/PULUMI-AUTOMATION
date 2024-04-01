@@ -24,6 +24,12 @@ def restore_from_snapshot():
     snapshot_name = config_object['snapshotName']
     managed_disk_name = config_object['managedDiskName']
     subnet_name = config_object['subnetName']
+    security_type = config_object['securityType']
+
+    security_type_map = {
+        "Standard": None,
+        "Trusted launch": azure.compute.SecurityTypes.TRUSTED_LAUNCH
+    }
 
 
     # Use existing Resource Group
@@ -100,7 +106,7 @@ def restore_from_snapshot():
             ),
         ),
         security_profile=azure.compute.SecurityProfileArgs(
-            security_type=azure.compute.SecurityTypes.TRUSTED_LAUNCH
+            security_type=security_type_map[security_type]
         )
     )
 
